@@ -1,32 +1,27 @@
 -----------------------------------------------------------------------------------------------
--- Client Lua Script for Generalist
+-- Client Lua Script for GeneralistEx
 -- Copyright (c) NCsoft. All rights reserved
 -----------------------------------------------------------------------------------------------
- 
 require "Window"
 require "GameLib"
 require "PlayerPathLib"
 require "Item"
 require "Money"
- 
 -----------------------------------------------------------------------------------------------
--- Generalist Module Definition
+-- GeneralistEx Module Definition
 -----------------------------------------------------------------------------------------------
-local Generalist = {} 
+local GeneralistEx = {} 
  
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-
--- local kcrSelectedText = ApolloColor.new("UI_BtnTextHoloPressedFlyby")
 local kcrEnabledColor = ApolloColor.new("UI_BtnTextHoloNormal")
 local kcrDisabledColor = ApolloColor.new("Disabled")
-
 local altTooltip = "<P Font=\"CRB_InterfaceSmall\" TextColor=\"white\">%s</P>"
 
 -- Costume slots, from the Character UI
---
-local genSlotFromId = -- string name, then id, then button art
+-- 	string name, then id, then button art
+local genSlotFromId = 
 {
 	[0]  = "ChestSlot",
 	[1]  = "LegsSlot",
@@ -80,13 +75,27 @@ local altPathToString = {
 	[PlayerPathLib.PlayerPathType_Scientist] = Apollo.GetString("PlayerPathScientist"),
 }
 
--- Lifted from Carbine's Inventory addon
-local karCurrency =  	-- Alt currency table; re-indexing the enums so they don't have to be in sequence code-side (and removing cash)
-{						-- To add a new currency just add an entry to the table; the UI will do the rest. Idx == 1 will be the default one shown
-	{eType = Money.CodeEnumCurrencyType.Renown, 			strTitle = Apollo.GetString("CRB_Renown"), 				strDescription = Apollo.GetString("CRB_Renown_Desc")},
-	{eType = Money.CodeEnumCurrencyType.ElderGems, 			strTitle = Apollo.GetString("CRB_Elder_Gems"), 			strDescription = Apollo.GetString("CRB_Elder_Gems_Desc")},
-	{eType = Money.CodeEnumCurrencyType.Prestige, 			strTitle = Apollo.GetString("CRB_Prestige"), 			strDescription = Apollo.GetString("CRB_Prestige_Desc")},
-	{eType = Money.CodeEnumCurrencyType.CraftingVouchers, 	strTitle = Apollo.GetString("CRB_Crafting_Vouchers"), 	strDescription = Apollo.GetString("CRB_Crafting_Voucher_Desc")}
+-- Alt currency table; re-indexing the enums so they don't have to be in sequence code-side (and removing cash)
+-- To add a new currency just add an entry to the table; the UI will do the rest. Idx == 1 will be the default one shown
+local karCurrency =  	
+{						
+	{
+		eType = Money.CodeEnumCurrencyType.Renown,
+		strTitle = Apollo.GetString("CRB_Renown"),
+		strDescription = Apollo.GetString("CRB_Renown_Desc")
+	},{
+		eType = Money.CodeEnumCurrencyType.ElderGems,
+		strTitle = Apollo.GetString("CRB_Elder_Gems"),
+		strDescription = Apollo.GetString("CRB_Elder_Gems_Desc")
+	},{
+		eType = Money.CodeEnumCurrencyType.Prestige,
+		strTitle = Apollo.GetString("CRB_Prestige"),
+		strDescription = Apollo.GetString("CRB_Prestige_Desc")
+	},{
+		eType = Money.CodeEnumCurrencyType.CraftingVouchers,
+		strTitle = Apollo.GetString("CRB_Crafting_Vouchers"),
+		strDescription = Apollo.GetString("CRB_Crafting_Voucher_Desc")
+	}
 }
 
 local origItemToolTipForm = nil
@@ -109,7 +118,7 @@ local kGenBogusRecipes = {
 -----------------------------------------------------------------------------------------------
 -- Initialization
 -----------------------------------------------------------------------------------------------
-function Generalist:new(o)
+function GeneralistEx:new(o)
     o = o or {}
     setmetatable(o, self)
     self.__index = self 
@@ -124,7 +133,7 @@ function Generalist:new(o)
     return o
 end
 
-function Generalist:Init()
+function GeneralistEx:Init()
 	local bHasConfigureFunction = false
 	local strConfigureButtonText = ""
 	local tDependencies = {
@@ -134,11 +143,11 @@ function Generalist:Init()
 end
 
 -----------------------------------------------------------------------------------------------
--- Generalist OnLoad
+-- GeneralistEx OnLoad
 -----------------------------------------------------------------------------------------------
-function Generalist:OnLoad()
+function GeneralistEx:OnLoad()
     -- load our form file
-	self.xmlDoc = XmlDoc.CreateFromFile("Generalist.xml")
+	self.xmlDoc = XmlDoc.CreateFromFile("GeneralistEx.xml")
 	self.xmlDoc:RegisterCallback("OnDocLoaded", self)
 	
 	-- load our version info
@@ -149,8 +158,8 @@ function Generalist:OnLoad()
 	
 	-- if this loaded too early ...
 	if TT == nil then
-		Print("Sorry, but Generalist managed to load before the ToolTips addon loaded.")
-		Print("You will not have Generalist information about inventory and alts which can learn schematics embedded in your tooltips.")
+		Print("Sorry, but GeneralistEx managed to load before the ToolTips addon loaded.")
+		Print("You will not have GeneralistEx information about inventory and alts which can learn schematics embedded in your tooltips.")
 		Print("Please do /reloadui if you would like to fix this.")
 		return
 	end
@@ -170,21 +179,17 @@ function Generalist:OnLoad()
 		-- Now create a new callback function for the item form
 		Tooltip.GetItemTooltipForm = function(luaCaller, wndControl, item, bStuff, nCount)
 			return self.ItemToolTip(luaCaller,wndControl,item,bStuff,nCount)
-		end
-		
-	end
-		
+		end	
+	end	
 end
 
 -----------------------------------------------------------------------------------------------
--- Generalist OnDocLoaded
+-- GeneralistEx OnDocLoaded
 -----------------------------------------------------------------------------------------------
-function Generalist:OnDocLoaded()
-
+function GeneralistEx:OnDocLoaded()
 	if self.xmlDoc ~= nil and self.xmlDoc:IsLoaded() then
-	
 		-- Set up the main window
-	    self.wndMain = Apollo.LoadForm(self.xmlDoc, "GeneralistForm", nil, self)
+	    self.wndMain = Apollo.LoadForm(self.xmlDoc, "GeneralistExForm", nil, self)
 		if self.wndMain == nil then
 			Apollo.AddAddonErrorText(self, "Could not load the main window for some reason.")
 			return
@@ -197,13 +202,13 @@ function Generalist:OnDocLoaded()
 	    self.wndMain:Show(false, true)
 	
 		-- put the version number in the title bar
-		self.wndMain:FindChild("Backing"):FindChild("Title"):SetText("Generalist v" .. self.version)
+		self.wndMain:FindChild("Backing"):FindChild("Title"):SetText("GeneralistEx v" .. self.version)
 
 		-- if the xmlDoc is no longer needed, you should set it to nil
 		-- self.xmlDoc = nil
 		
 		-- Register the slash command
-		Apollo.RegisterSlashCommand("gen", "OnGeneralistOn", self)
+		Apollo.RegisterSlashCommand("gen", "OnGeneralistExOn", self)
 		
 		-- Register handlers for events, slash commands and timer, etc.
 		-- e.g. Apollo.RegisterEventHandler("KeyDown", "OnKeyDown", self)
@@ -213,7 +218,7 @@ function Generalist:OnDocLoaded()
 		
 		-- Get ourselves into the Interface menu
 		Apollo.RegisterEventHandler("InterfaceMenuListHasLoaded", "OnInterfaceMenuListHasLoaded", self)
-		Apollo.RegisterEventHandler("ToggleGeneralist", "OnGeneralistOn", self)
+		Apollo.RegisterEventHandler("ToggleGeneralistEx", "OnGeneralistExOn", self)
 		
 		-- Update my tradeskills when I learn a new one
 		Apollo.RegisterEventHandler("TradeskillAchievementComplete", "GetTradeskills", self)
@@ -243,7 +248,6 @@ function Generalist:OnDocLoaded()
 		
 		-- And register for the event of changing worlds so we can restart the timer
 		Apollo.RegisterEventHandler("ChangeWorld", "OnChangeWorld", self)
-		
 	end
 end
 
@@ -251,9 +255,7 @@ end
 -- Timer function.  Used to keep trying to get the player unit on load
 -- until GameLib has caught up and we have it.
 ---------------------------------------------------------------------------------------------------
-
-function Generalist:OnTimer()
-
+function GeneralistEx:OnTimer()
 	-- Get the current character's name
 	local unitPlayer = GameLib.GetPlayerUnit()
 
@@ -267,65 +269,52 @@ function Generalist:OnTimer()
 	--
 	self.timer = nil
 	self:UpdateCurrentCharacter()
-	
 end
 
 ---------------------------------------------------------------------------------------------------
 -- Timer when we change worlds
 ---------------------------------------------------------------------------------------------------
-
-function Generalist:OnChangeWorld()
+function GeneralistEx:OnChangeWorld()
 	-- Restart the timer until we can load player info
 	self.timer = ApolloTimer.Create(2, true, "OnTimer", self)	
 end
-
 ---------------------------------------------------------------------------------------------------
 -- Add us to interface menu
 ---------------------------------------------------------------------------------------------------
-
-function Generalist:OnInterfaceMenuListHasLoaded()
-	Event_FireGenericEvent("InterfaceMenuList_NewAddOn", "Generalist", 
-		{"ToggleGeneralist", "", "ChatLogSprites:CombatLogSaveLogBtnNormal"})
+function GeneralistEx:OnInterfaceMenuListHasLoaded()
+	Event_FireGenericEvent("InterfaceMenuList_NewAddOn", "GeneralistEx", 
+		{"ToggleGeneralistEx", "", "ChatLogSprites:CombatLogSaveLogBtnNormal"})
 end
-
 -----------------------------------------------------------------------------------------------
 -- Main slash command (or clicking us in the interface window)
 -----------------------------------------------------------------------------------------------
-
 -- on SlashCommand "/gen"
-function Generalist:OnGeneralistOn()
-
+function GeneralistEx:OnGeneralistExOn()
 	-- show the window
 	self.wndMain:Invoke()
-
 	-- populate the character list
 	self:PopulateCharList()
-		
 end
-
 -----------------------------------------------------------------------------------------------
 -- Close window button functions.  These don't get simpler.
 -----------------------------------------------------------------------------------------------
-
-function Generalist:OnCancel()
+function GeneralistEx:OnCancel()
 	self.wndMain:Show(false,true)
 end
 
-function Generalist:OnDetailClose()
+function GeneralistEx:OnDetailClose()
 	-- Close the detail window
 	self.wndDetail:Show(false,true)
 end
 
-function Generalist:OnSearchClose()
+function GeneralistEx:OnSearchClose()
 	-- Close the search window
 	self.wndSearch:Show(false,true)
 end
-
 -----------------------------------------------------------------------------------------------
 -- Populate list of characters
 -----------------------------------------------------------------------------------------------
-
-function Generalist:PopulateCharList()
+function GeneralistEx:PopulateCharList()
 	-- make sure the list is empty to start with
 	self:DestroyCharList()
 	
@@ -387,7 +376,7 @@ end
 
 -- Clear the character list
 --
-function Generalist:DestroyCharList()
+function GeneralistEx:DestroyCharList()
 	-- destroy all the wnd inside the list
 	for idx,wnd in ipairs(self.tItems) do
 		wnd:Destroy()
@@ -401,7 +390,7 @@ end
 -- 
 -- Add alt's entry into the item list at a particular index
 --
-function Generalist:AddCharToList(name,i)
+function GeneralistEx:AddCharToList(name,i)
 	-- load the window item for the list item
 	local wnd = Apollo.LoadForm(self.xmlDoc, "CharListEntry", self.charList, self)
 	
@@ -447,11 +436,10 @@ function Generalist:AddCharToList(name,i)
 	end
 	wnd:SetData(i)
 end
-
 -----------------------------------------------------------------------------------------------
 -- Add the current character to the data structure and update their info
 -----------------------------------------------------------------------------------------------
-function Generalist:UpdateCurrentCharacter()
+function GeneralistEx:UpdateCurrentCharacter()
 
 	-- Get the current character's name
 	local unitPlayer = GameLib.GetPlayerUnit()
@@ -507,7 +495,6 @@ function Generalist:UpdateCurrentCharacter()
 	self:GetCharDecor()
 	
 end
-
 -----------------------------------------------------------------------------------------------
 -- Functions for storing particular parts of the current character's data
 -----------------------------------------------------------------------------------------------
@@ -515,8 +502,7 @@ end
 ----------------------------
 -- Character's level
 ----------------------------
-
-function Generalist:GetCharLevel()
+function GeneralistEx:GetCharLevel()
 
 	local unitPlayer = GameLib.GetPlayerUnit()
 	if unitPlayer == nil then return end
@@ -525,12 +511,10 @@ function Generalist:GetCharLevel()
 	self.altData[myName].level = unitPlayer:GetLevel()
 		
 end
-
 ----------------------------
 -- Character's cash
 ----------------------------
-
-function Generalist:GetCharCash()
+function GeneralistEx:GetCharCash()
 
 	local unitPlayer = GameLib.GetPlayerUnit()
 	if unitPlayer == nil then return end
@@ -539,12 +523,10 @@ function Generalist:GetCharCash()
 	self.altData[myName].cash = GameLib.GetPlayerCurrency():GetAmount()
 		
 end
-
 ----------------------------
 -- Character's inventory
 ----------------------------
-
-function Generalist:GetCharInventory()
+function GeneralistEx:GetCharInventory()
 
 	local unitPlayer = GameLib.GetPlayerUnit()
 	if unitPlayer == nil then return end
@@ -639,12 +621,10 @@ function Generalist:GetCharInventory()
 	self.altData[myName].inventory = myInv
 	
 end
-
 ----------------------------
 -- Character's currencies
 ----------------------------
-
-function Generalist:GetCharCurrency()
+function GeneralistEx:GetCharCurrency()
 
 	-- If possible, get my name.
 	local unitPlayer = GameLib.GetPlayerUnit()
@@ -677,7 +657,7 @@ end
 -- Character's unlocked amps
 ----------------------------
 
-function Generalist:GetUnlockedAmps()
+function GeneralistEx:GetUnlockedAmps()
 
 	-- If possible, get my name.
 	local unitPlayer = GameLib.GetPlayerUnit()
@@ -707,7 +687,7 @@ end
 -- Character's reputations
 ----------------------------
 
-function Generalist:GetCharReputations()
+function GeneralistEx:GetCharReputations()
 
 	-- If possible, get my name.
 	local unitPlayer = GameLib.GetPlayerUnit()
@@ -818,7 +798,7 @@ end -- of gathering rep
 -- Character's decor
 ----------------------------
 
-function Generalist:GetCharDecor()
+function GeneralistEx:GetCharDecor()
 
 	-- If possible, get my name.
 	local unitPlayer = GameLib.GetPlayerUnit()
@@ -877,7 +857,7 @@ end
 -- Character's tradeskills
 ----------------------------
 
-function Generalist:GetTradeskills()
+function GeneralistEx:GetTradeskills()
 	
 	-- If possible, get my name.
 	local unitPlayer = GameLib.GetPlayerUnit()
@@ -961,7 +941,7 @@ end
 -- Character's equipped items
 ----------------------------
 
-function Generalist:GetCharEquipment()
+function GeneralistEx:GetCharEquipment()
 
 	-- If possible, get my name.
 	local unitPlayer = GameLib.GetPlayerUnit()
@@ -1004,7 +984,7 @@ end
 -- Character's dyes
 ----------------------------
 
-function Generalist:GetCharDyes()
+function GeneralistEx:GetCharDyes()
 	
 	-- If possible, get my name.
 	local unitPlayer = GameLib.GetPlayerUnit()
@@ -1030,7 +1010,7 @@ end
 -- Generate a Chat Link for an item
 -----------------------------------------------------------------------------------------------
 
-function Generalist:OnGenerateItemLink(wndHandler,wndControl)
+function GeneralistEx:OnGenerateItemLink(wndHandler,wndControl)
     -- make sure the wndControl is valid
     if wndHandler ~= wndControl then
         return
@@ -1050,7 +1030,7 @@ end
 -----------------------------------------------------------------------------------------------
 -- Activating the Detail window
 -----------------------------------------------------------------------------------------------
-function Generalist:OnCharacterSelected(wndHandler, wndControl)
+function GeneralistEx:OnCharacterSelected(wndHandler, wndControl)
     -- make sure the wndControl is valid
     if wndHandler ~= wndControl then
         return
@@ -1084,7 +1064,7 @@ end
 -----------------------------------------------------------------------------------------------
 -- Populating the Detail window
 -----------------------------------------------------------------------------------------------
-function Generalist:PopulateDetailWindow(charName)
+function GeneralistEx:PopulateDetailWindow(charName)
 
 	-- If one previously existed, nuke it.
 	if self.wndDetail ~= nil then
@@ -1233,7 +1213,7 @@ end
 -- Open the Search Form
 ---------------------------------------------------------------------------------------------------
 
-function Generalist:OpenSearch( wndHandler, wndControl, eMouseButton )
+function GeneralistEx:OpenSearch( wndHandler, wndControl, eMouseButton )
 	
 	-- Is a detail window already open?  If so, no search.
 	if self.wndDetail ~= nil and self.wndDetail:IsShown() then
@@ -1262,7 +1242,7 @@ end
 -----------------------------------------------------------------------------------------------
 -- Saving and loading our data
 -----------------------------------------------------------------------------------------------
-function Generalist:OnSave(eLevel)
+function GeneralistEx:OnSave(eLevel)
     -- Only save at the Realm level
     if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Realm then
         return nil
@@ -1275,7 +1255,7 @@ function Generalist:OnSave(eLevel)
 	return self.altData
 end
 
-function Generalist:OnRestore(eLevel, tData)
+function GeneralistEx:OnRestore(eLevel, tData)
     -- Only restore at the Realm level
     if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Realm then
         return nil
@@ -1296,7 +1276,7 @@ end
 -- Ensure backwards compatibility by adding empty arrays.
 ---------------------------------------------------------------------------------------------------
 
-function Generalist:EnsureBackwardsCompatibility(myName)
+function GeneralistEx:EnsureBackwardsCompatibility(myName)
 
 	-- Schematics table
 	if self.altData[myName].schematics == nil then
@@ -1364,7 +1344,7 @@ end
 -- TradeskillBtn Functions
 ---------------------------------------------------------------------------------------------------
 
-function Generalist:OnAmpTradePicked( wndHandler, wndControl, eMouseButton )
+function GeneralistEx:OnAmpTradePicked( wndHandler, wndControl, eMouseButton )
 
 	-- Close the popup menu
 	self.wndAmps:FindChild("TradeskillPickerListFrame"):Show(false)
@@ -1563,7 +1543,7 @@ end
 -- The Search Function
 ---------------------------------------------------------------------------------------------------
 
-function Generalist:GeneralistSearchSubmitted( wndHandler, wndControl, eMouseButton )
+function GeneralistEx:GeneralistExSearchSubmitted( wndHandler, wndControl, eMouseButton )
 
 	-- First, clear previous search results.
 	--
@@ -1647,20 +1627,20 @@ end
 -- Tooltip Hook
 ---------------------------------------------------------------------------------------------------
 
-function Generalist:ItemToolTip(wndControl, item, bStuff, nCount)
-	local this = Apollo.GetAddon("Generalist")
+function GeneralistEx:ItemToolTip(wndControl, item, bStuff, nCount)
+	local this = Apollo.GetAddon("GeneralistEx")
 	
 	wndControl:SetTooltipDoc(nil)
 	local wndTooltip, wndTooltipComp = origItemToolTipForm(self,wndControl,item,bStuff,nCount)
 	
-	-- Add Generalist info about who has this thing.
+	-- Add GeneralistEx info about who has this thing.
 	this:AddTooltipInfo(wndControl, wndTooltip, item)
 	
 	return wndTooltip, wndTooltipComp
 	
 end
 
-function Generalist:AddTooltipInfo(wndParent, wndTooltip, item)
+function GeneralistEx:AddTooltipInfo(wndParent, wndTooltip, item)
 
 	-- Make sure we actually have a tooltip to work with
 	if wndTooltip == nil then return end
@@ -1831,7 +1811,7 @@ function Generalist:AddTooltipInfo(wndParent, wndTooltip, item)
 		--
 		if itemCreated ~= nil and theTier ~= nil and theSkill ~= nil then
 		
-			-- Validate the recipe name.  This is mainly for Generalist's
+			-- Validate the recipe name.  This is mainly for GeneralistEx's
 			-- developer to find recipes whose names don't match the items they
 			-- create, which confuses the addon.  So we leave this block of code
 			-- turned off for most people.
@@ -1956,7 +1936,7 @@ end
 
 -- Add a child to that tooltip item containing text.
 --
-function Generalist:AddToGenTooltip( wndList, strText )
+function GeneralistEx:AddToGenTooltip( wndList, strText )
 	local invItem = Apollo.LoadForm(self.xmlDoc,"TooltipInventoryItem", wndList, self)
 	invItem:SetText(strText)
 	invItem:SetHeightToContentHeight()
@@ -1966,7 +1946,7 @@ end
 -- Functions for forgetting an alt
 ---------------------------------------------------------------------------------------------------
 
-function Generalist:OnForgetButtonPushed( wndHandler, wndControl, eMouseButton )
+function GeneralistEx:OnForgetButtonPushed( wndHandler, wndControl, eMouseButton )
 
 	if wndHandler ~= wndControl then
 		return
@@ -1977,7 +1957,7 @@ function Generalist:OnForgetButtonPushed( wndHandler, wndControl, eMouseButton )
 	
 end
 
-function Generalist:OnForgetConfirmNo( wndHandler, wndControl, eMouseButton )
+function GeneralistEx:OnForgetConfirmNo( wndHandler, wndControl, eMouseButton )
 
 	if wndHandler ~= wndControl then
 		return
@@ -1987,7 +1967,7 @@ function Generalist:OnForgetConfirmNo( wndHandler, wndControl, eMouseButton )
 	
 end
 
-function Generalist:OnForgetConfirmYes( wndHandler, wndControl, eMouseButton )
+function GeneralistEx:OnForgetConfirmYes( wndHandler, wndControl, eMouseButton )
 
 	if wndHandler ~= wndControl then
 		return
@@ -2016,5 +1996,5 @@ end
 -----------------------------------------------------------------------------------------------
 -- Instantiation
 -----------------------------------------------------------------------------------------------
-local GeneralistInstance = Generalist:new()
-GeneralistInstance:Init()
+local GeneralistExInstance = GeneralistEx:new()
+GeneralistExInstance:Init()
