@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Addon Author="sk4p" APIVersion="10" Name="Generalist" Description="A handy tool for managing alternate characters." Version="1.0.0">
+<Addon Author="sk4p" APIVersion="10" Name="Generalist" Description="A handy tool for managing alternate characters." Version="1.0.1">
 	<Script Name="Generalist.lua"/>
 	<Form Name="Generalist.xml"/>
 </Addon>

@@ -1645,12 +1645,15 @@ function Generalist:AddTooltipInfo(wndParent, wndTooltip, item)
 	-- Make sure we actually have a tooltip to work with
 	if wndTooltip == nil then return end
 	
-	local wndInv = Apollo.LoadForm(self.xmlDoc, "TooltipInventorySummary",
-		wndTooltip:FindChild("Items"), self)
+	local wndInv = Apollo.LoadForm(self.xmlDoc, "TooltipInventorySummary", wndTooltip:FindChild("Items"), self)
+	
+	-- Carbine changed something in the Vendor Tooltips, making our hook not work.
+	-- Disabling this now for those vendors.
+	if wndInv == nil then return end
+	
 	local wndList = wndInv:FindChild("TooltipInventoryList")
 		
-	-- Now we loop through everyone's inventory to find matches.
-	
+	-- Now we loop through everyone's inventory to find matches.	
 	-- Get the current character's faction
 	local factID = GameLib.GetPlayerUnit():GetFaction()
 	
