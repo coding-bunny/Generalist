@@ -813,9 +813,10 @@ function Generalist:GetCharDecor()
 	
 	-- Temp decor table.
 	local theDecor = {}
+	local libResidence = HousingLib.GetResidence()
 	
 	-- Get placed decor.
-	local tDecor = HousingLib.GetPlacedDecorList()
+	local tDecor = libResidence:GetPlacedDecorList()
 	
 	-- Loop through it.
 	for _,tItem in ipairs(tDecor) do
@@ -832,7 +833,7 @@ function Generalist:GetCharDecor()
 	end
 	
 	-- Get crated decor.
-	tDecor = HousingLib.GetDecorCrateList()
+	tDecor = libResidence:GetDecorCrateList()
 	
 		-- Loop through it.
 	for _,tItem in ipairs(tDecor) do
@@ -1628,7 +1629,7 @@ end
 ---------------------------------------------------------------------------------------------------
 
 function Generalist:ItemToolTip(wndControl, item, bStuff, nCount)
-	local this = Apollo.GetAddon("Generalist")
+	local this = Apollo.GetAddon("GeneralistEx")
 	
 	wndControl:SetTooltipDoc(nil)
 	local wndTooltip, wndTooltipComp = origItemToolTipForm(self,wndControl,item,bStuff,nCount)
