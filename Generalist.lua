@@ -821,7 +821,7 @@ function Generalist:GetCharDecor()
 	-- Loop through it.
 	for _,tItem in ipairs(tDecor) do
 	
-		local name = tItem.strName
+		local name = tItem:GetName()
 	
 		if theDecor[name] == nil then
 			theDecor[name] = {}
