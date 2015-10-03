@@ -1787,7 +1787,12 @@ function Generalist:AddTooltipInfo(wndParent, wndTooltip, item)
 
 		-- For tier and skill, we need to look at the activated spell
 		--
-		local theSpell = item:GetActivateSpell()		
+		local theSpell
+		
+		if item.GetActivateSpell ~= nil then
+		  theSpell = item:GetActivateSpell()
+	  end
+	  		
 		if theSpell ~= nil then
 		
 			theTier = theSpell:GetTradeskillRequirements().eTier
