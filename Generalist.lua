@@ -1,37 +1,28 @@
------------------------------------------------------------------------------------------------
--- Client Lua Script for Generalist
--- Copyright (c) NCsoft. All rights reserved
------------------------------------------------------------------------------------------------
 require "Window"
 require "GameLib"
 require "PlayerPathLib"
 require "Item"
 require "Money"
------------------------------------------------------------------------------------------------
--- Generalist Module Definition
------------------------------------------------------------------------------------------------
-local Generalist = {} 
- 
------------------------------------------------------------------------------------------------
+
+-- Module Definition
+local Generalist = {}
+
 -- Constants
------------------------------------------------------------------------------------------------
 local kcrEnabledColor = ApolloColor.new("UI_BtnTextHoloNormal")
 local kcrDisabledColor = ApolloColor.new("Disabled")
-local altTooltip = "<P Font=\"CRB_InterfaceSmall\" TextColor=\"white\">%s</P>"
+local kstrToolTip = "<P Font=\"CRB_InterfaceSmall\" TextColor=\"white\">%s</P>"
 
--- Costume slots, from the Character UI
--- 	string name, then id, then button art
-local genSlotFromId = 
-{
-	[0]  = "ChestSlot",
-	[1]  = "LegsSlot",
-	[2]  = "HeadSlot",
-	[3]  = "ShoulderSlot",
-	[4]  = "FeetSlot",
-	[5]  = "HandsSlot",
-	[6]  = "ToolSlot",
-	[7]  = "AttachmentSlot",
-	[8]  = "SupportSlot",
+-- Maps the SlotId from the CharacterUI to the string representation.
+local karrSlotIdToString = {
+	[0] = "ChestSlot",
+	[1] = "LegsSlot",
+	[2] = "HeadSlot",
+	[3] = "ShoulderSlot",
+	[4] = "FeetSlot",
+	[5] = "HandsSlot",
+	[6] = "ToolSlot",
+	[7] = "AttachmentSlot",
+	[8] = "SupportSlot",
 	[10] = "ImplantSlot",
 	[11] = "GadgetSlot",
 	[15] = "ShieldSlot",	
@@ -41,43 +32,37 @@ local genSlotFromId =
 	[19] = "BagSlot2",
 	[20] = "BagSlot3",			
 }
-
-local altClassToIcon =
+local karrClassToIcon =
 {
-	[GameLib.CodeEnumClass.Warrior] 		= "IconSprites:Icon_Windows_UI_CRB_Warrior",
-	[GameLib.CodeEnumClass.Engineer] 		= "IconSprites:Icon_Windows_UI_CRB_Engineer",
-	[GameLib.CodeEnumClass.Esper] 			= "IconSprites:Icon_Windows_UI_CRB_Esper",
-	[GameLib.CodeEnumClass.Medic] 			= "IconSprites:Icon_Windows_UI_CRB_Medic",
-	[GameLib.CodeEnumClass.Stalker] 		= "IconSprites:Icon_Windows_UI_CRB_Stalker",
-	[GameLib.CodeEnumClass.Spellslinger] 	= "IconSprites:Icon_Windows_UI_CRB_Spellslinger",
+	[GameLib.CodeEnumClass.Warrior] = "IconSprites:Icon_Windows_UI_CRB_Warrior",
+	[GameLib.CodeEnumClass.Engineer] = "IconSprites:Icon_Windows_UI_CRB_Engineer",
+	[GameLib.CodeEnumClass.Esper] = "IconSprites:Icon_Windows_UI_CRB_Esper",
+	[GameLib.CodeEnumClass.Medic] = "IconSprites:Icon_Windows_UI_CRB_Medic",
+	[GameLib.CodeEnumClass.Stalker] = "IconSprites:Icon_Windows_UI_CRB_Stalker",
+	[GameLib.CodeEnumClass.Spellslinger] = "IconSprites:Icon_Windows_UI_CRB_Spellslinger",
 }
-
-local altClassToString =
+local karrClassToString =
 {
-	[GameLib.CodeEnumClass.Warrior] 		= "Warrior",
-	[GameLib.CodeEnumClass.Engineer] 		= "Engineer",
-	[GameLib.CodeEnumClass.Esper] 			= "Esper",
-	[GameLib.CodeEnumClass.Medic] 			= "Medic",
-	[GameLib.CodeEnumClass.Stalker] 		= "Stalker",
-	[GameLib.CodeEnumClass.Spellslinger] 	= "Spellslinger",
+	[GameLib.CodeEnumClass.Warrior] = "Warrior",
+	[GameLib.CodeEnumClass.Engineer] = "Engineer",
+	[GameLib.CodeEnumClass.Esper] = "Esper",
+	[GameLib.CodeEnumClass.Medic] = "Medic",
+	[GameLib.CodeEnumClass.Stalker] = "Stalker",
+	[GameLib.CodeEnumClass.Spellslinger] = "Spellslinger",
 }
-
-local altPathToIcon = {
+local karrPathToIcon = {
 	[PlayerPathLib.PlayerPathType_Explorer] = "CRB_PlayerPathSprites:spr_Path_Explorer_Stretch",
 	[PlayerPathLib.PlayerPathType_Soldier] = "CRB_PlayerPathSprites:spr_Path_Soldier_Stretch",
 	[PlayerPathLib.PlayerPathType_Settler] = "CRB_PlayerPathSprites:spr_Path_Settler_Stretch",
 	[PlayerPathLib.PlayerPathType_Scientist] = "CRB_PlayerPathSprites:spr_Path_Scientist_Stretch",
 }
-local altPathToString = {
+local karrPathToString = {
 	[PlayerPathLib.PlayerPathType_Explorer] = Apollo.GetString("PlayerPathExplorer"),
 	[PlayerPathLib.PlayerPathType_Soldier] = Apollo.GetString("PlayerPathSoldier"),
 	[PlayerPathLib.PlayerPathType_Settler] = Apollo.GetString("PlayerPathSettler"),
 	[PlayerPathLib.PlayerPathType_Scientist] = Apollo.GetString("PlayerPathScientist"),
 }
-
--- Alt currency table; re-indexing the enums so they don't have to be in sequence code-side (and removing cash)
--- To add a new currency just add an entry to the table; the UI will do the rest. Idx == 1 will be the default one shown
-local karCurrency =  	
+local karrCurrency =  	
 {						
 	{
 		eType = Money.CodeEnumCurrencyType.Renown,
@@ -119,68 +104,61 @@ local kGenBogusRecipes = {
 -- Initialization
 -----------------------------------------------------------------------------------------------
 function Generalist:new(o)
-    o = o or {}
-    setmetatable(o, self)
-    self.__index = self 
-
-    -- initialize variables here
-	o.tItems = {} -- keep track of all the list items
-	o.altData = {}
-	o.recipeBogus = kGenBogusRecipes
-	
-	o.wndSelectedListItem = nil -- keep track of which list item is currently selected
-	
-    return o
+  o = o or {}
+  
+  setmetatable(o, self)
+  
+  self.__index = self 
+  o.tItems = {}
+  o.altData = {}
+  o.recipeBogus = kGenBogusRecipes  
+  o.wndSelectedListItem = nil
+  
+  return o
 end
 
 function Generalist:Init()
 	local bHasConfigureFunction = false
 	local strConfigureButtonText = ""
-	local tDependencies = {
-		-- unit or package names depended on go here
-	}
-    Apollo.RegisterAddon(self, bHasConfigureFunction, strConfigureButtonText, tDependencies)
+	local tDependencies = {}
+    
+  Apollo.RegisterAddon(self, bHasConfigureFunction, strConfigureButtonText, tDependencies)
 end
 
 -----------------------------------------------------------------------------------------------
 -- Generalist OnLoad
 -----------------------------------------------------------------------------------------------
 function Generalist:OnLoad()
-    -- load our form file
-	self.xmlDoc = XmlDoc.CreateFromFile("Generalist.xml")
-	self.xmlDoc:RegisterCallback("OnDocLoaded", self)
-	
-	-- load our version info
-	self.version = XmlDoc.CreateFromFile("toc.xml"):ToTable().Version
-		
-	-- init hook for tooltips
-	local TT = Apollo.GetAddon("ToolTips")
-	
-	-- if this loaded too early ...
-	if TT == nil then
-		Print("Sorry, but Generalist managed to load before the ToolTips addon loaded.")
-		Print("You will not have Generalist information about inventory and alts which can learn schematics embedded in your tooltips.")
-		Print("Please do /reloadui if you would like to fix this.")
-		return
-	end
-	
-	-- Preserve the original callbacks call
-	local origCreateCallNames = TT.CreateCallNames
-	
-	-- And then create  new callbacks
-	TT.CreateCallNames = function(luaCaller)
-	
-		-- First, call the orignal function to create the original callbacks
-		origCreateCallNames(luaCaller)
-		
-		-- Save the original form
-		origItemToolTipForm = Tooltip.GetItemTooltipForm
-		
-		-- Now create a new callback function for the item form
-		Tooltip.GetItemTooltipForm = function(luaCaller, wndControl, item, bStuff, nCount)
-			return self.ItemToolTip(luaCaller,wndControl,item,bStuff,nCount)
-		end	
-	end	
+  self.xmlDoc = XmlDoc.CreateFromFile("Generalist.xml")
+  self.version = XmlDoc.CreateFromFile("toc.xml"):ToTable().Version
+  
+  self.xmlDoc:RegisterCallback("OnDocLoaded", self)
+  
+  self:HookToolTip()
+end
+
+-- Hooks into the ToolTip Addon and adds additional callbacks so we can inject
+-- our custom tooltip messages for tracking everything.
+function Generalist:HookToolTip()
+  local TT = Apollo.GetAddon("ToolTips")
+  
+  if TT == nil then
+    Print("Sorry, but Generalist managed to load before the ToolTips addon loaded.")
+    Print("You will not have Generalist information about inventory and alts which can learn schematics embedded in your tooltips.")
+    Print("Please do /reloadui if you would like to fix this.")
+    
+    return
+  end
+  
+  -- Preserve the original callbacks call
+  local origCreateCallNames = TT.CreateCallNames
+  TT.CreateCallNames = function(luaCaller)
+                        origCreateCallNames(luaCaller)
+                        origItemToolTipForm = Tooltip.GetItemTooltipForm
+                        Tooltip.GetItemTooltipForm = function(luaCaller, wndControl, item, bStuff, nCount)
+                                                      return self.ItemToolTip(luaCaller,wndControl,item,bStuff,nCount)
+                                                     end 
+                       end 
 end
 
 -----------------------------------------------------------------------------------------------
@@ -412,9 +390,9 @@ function Generalist:AddCharToList(name,i)
 		wnd:FindChild("CharLevel"):SetText(tostring(entry.level))
 		
 		-- Character's Class, as icon with tooltip
-		wnd:FindChild("CharClass"):SetSprite(altClassToIcon[entry.class])
-		if altClassToString[entry.class] ~= nil then
-			wnd:FindChild("CharClass"):SetTooltip(string.format(altTooltip, altClassToString[entry.class]))
+		wnd:FindChild("CharClass"):SetSprite(karrClassToIcon[entry.class])
+		if karrClassToString[entry.class] ~= nil then
+			wnd:FindChild("CharClass"):SetTooltip(string.format(kstrToolTip, karrClassToString[entry.class]))
 		end
 			
 		-- Character's Gold
@@ -428,9 +406,9 @@ function Generalist:AddCharToList(name,i)
 		wnd:FindChild("CharZone"):SetText(entry.zone)
 		
 		-- Character's Path
-		wnd:FindChild("CharPath"):SetSprite(altPathToIcon[entry.path])
-		if altPathToString[entry.path] ~= nil then
-			wnd:FindChild("CharPath"):SetTooltip(string.format(altTooltip, altPathToString[entry.path]))
+		wnd:FindChild("CharPath"):SetSprite(karrPathToIcon[entry.path])
+		if karrPathToString[entry.path] ~= nil then
+			wnd:FindChild("CharPath"):SetTooltip(string.format(kstrToolTip, karrPathToString[entry.path]))
 		end
 		
 	end
@@ -636,9 +614,9 @@ function Generalist:GetCharCurrency()
 	local currency = {}
 
 	-- Loop through currencies
-	for idx = 1, #karCurrency do
+	for idx = 1, #karrCurrency do
 		
-		local tData = karCurrency[idx]
+		local tData = karrCurrency[idx]
 		local cType = tData.eType
 		
 		local theAmount = GameLib.GetPlayerCurrency(tData.eType):GetAmount()
@@ -1101,9 +1079,9 @@ function Generalist:PopulateDetailWindow(charName)
 	self.wndDetail:FindChild("PlayerLevel"):SetText("Level " .. tostring(entry.level))
 			
 	-- Character's Class, as icon with tooltip
-	self.wndDetail:FindChild("PlayerClass"):SetSprite(altClassToIcon[entry.class])
-	if altClassToString[entry.class] ~= nil then
-		self.wndDetail:FindChild("PlayerClass"):SetTooltip(string.format(altTooltip, altClassToString[entry.class]))
+	self.wndDetail:FindChild("PlayerClass"):SetSprite(karrClassToIcon[entry.class])
+	if karrClassToString[entry.class] ~= nil then
+		self.wndDetail:FindChild("PlayerClass"):SetTooltip(string.format(kstrToolTip, karrClassToString[entry.class]))
 	end
 			
 	-- Character's Gold
@@ -1114,9 +1092,9 @@ function Generalist:PopulateDetailWindow(charName)
 	end
 		
 	-- Character's Path
-	self.wndDetail:FindChild("PlayerPath"):SetSprite(altPathToIcon[entry.path])
-	if altPathToString[entry.path] ~= nil then
-		self.wndDetail:FindChild("PlayerPath"):SetTooltip(string.format(altTooltip, altPathToString[entry.path]))
+	self.wndDetail:FindChild("PlayerPath"):SetSprite(karrPathToIcon[entry.path])
+	if karrPathToString[entry.path] ~= nil then
+		self.wndDetail:FindChild("PlayerPath"):SetTooltip(string.format(kstrToolTip, karrPathToString[entry.path]))
 	end
 	
 	-- Tab set
@@ -1187,10 +1165,10 @@ function Generalist:PopulateDetailWindow(charName)
 	
 		local itemData = Item.GetDataFromId(id)
 		
-		if genSlotFromId[key] ~= nil then
+		if karrSlotIdToString[key] ~= nil then
 		
 			-- Name of the slot control
-			local slot = self.wndEquip:FindChild(genSlotFromId[key])
+			local slot = self.wndEquip:FindChild(karrSlotIdToString[key])
 			
 			-- Set the icon
 			slot:SetSprite(itemData:GetIcon())
@@ -1441,9 +1419,9 @@ function Generalist:OnAmpTradePicked( wndHandler, wndControl, eMouseButton )
 	elseif pickedSkill == 'currency' then -- currencies
 	
 		-- Loop through currencies
-		for idx = 1, #karCurrency do
+		for idx = 1, #karrCurrency do
 		
-			local tData = karCurrency[idx]
+			local tData = karrCurrency[idx]
 			local cType = tData.eType
 			
 			-- Do we have a currency of this type?
@@ -1629,7 +1607,7 @@ end
 ---------------------------------------------------------------------------------------------------
 
 function Generalist:ItemToolTip(wndControl, item, bStuff, nCount)
-	local this = Apollo.GetAddon("GeneralistEx")
+	local this = Apollo.GetAddon("Generalist")
 	
 	wndControl:SetTooltipDoc(nil)
 	local wndTooltip, wndTooltipComp = origItemToolTipForm(self,wndControl,item,bStuff,nCount)
