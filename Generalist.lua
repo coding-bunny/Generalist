@@ -220,6 +220,12 @@ function Generalist:OnDocLoaded()
 		
 		-- Update my dyes if I learn one
 		Apollo.RegisterEventHandler("DyeLearned", "GetCharDyes", self)
+		
+		-- Update contracts if something changes
+		Apollo.RegisterEventHandler("ContractBoardClose", "GetCharContracts", self)
+		Apollo.RegisterEventHandler("ContractBoardOpen", "GetCharContracts", self)
+		Apollo.RegisterEventHandler("ContractObjectiveUpdated", "GetCharContracts", self)
+		Apollo.RegisterEventHandler("ContractStateChanged", "GetCharContracts", self)
 
 		-- Register a timer until we can load player info
 		self.timer = ApolloTimer.Create(2, true, "OnTimer", self)
@@ -288,6 +294,11 @@ end
 function Generalist:OnSearchClose()
 	-- Close the search window
 	self.wndSearch:Show(false,true)
+end
+
+function Generalist:OnContractsClose()
+	-- Close the contracts window
+	self.wndContracts:Show(false,true)
 end
 -----------------------------------------------------------------------------------------------
 -- Populate list of characters
@@ -471,6 +482,9 @@ function Generalist:UpdateCurrentCharacter()
 	
 	-- Decor
 	self:GetCharDecor()
+	
+	-- Contracts
+	self:GetCharContracts()
 	
 end
 -----------------------------------------------------------------------------------------------
@@ -985,6 +999,43 @@ function Generalist:GetCharDyes()
 	
 end
 
+----------------------------
+-- Character's contracts
+----------------------------
+
+function Generalist:GetCharContracts()
+	
+	-- If possible, get my name.
+	local unitPlayer = GameLib.GetPlayerUnit()
+	if unitPlayer == nil then return end
+	local myName = unitPlayer:GetName()
+	if self.altData[myName] == nil then self.altData[myName] = {} end
+	
+	-- Get contract data
+	local contracts = {}
+	for eContractType, arContracts in pairs(ContractsLib.GetActiveContracts()) do
+		for idx, contract in ipairs(arContracts) do
+			local quest = contract:GetQuest()
+			local strObjective = ""
+			for idx, tObjective in pairs(quest:GetVisibleObjectiveData()) do
+				if tObjective.nCompleted < tObjective.nNeeded then
+					strObjective = "["..tostring(tObjective.nCompleted).."/"..tostring(tObjective.nNeeded).."] "..string.gsub(tObjective.strDescription, '<.->', "")
+					break
+				end
+			end
+			if not contracts[eContractType] then contracts[eContractType] = { arContracts = {} } end
+			table.insert(contracts[eContractType].arContracts, {
+				strTitle = quest:GetTitle(),
+				strObjective = strObjective,
+			})
+		end
+	end
+	
+	-- And save
+	self.altData[myName].contracts = contracts
+	
+end
+
 -----------------------------------------------------------------------------------------------
 -- Generate a Chat Link for an item
 -----------------------------------------------------------------------------------------------
@@ -1218,6 +1269,51 @@ function Generalist:OpenSearch( wndHandler, wndControl, eMouseButton )
 	
 end
 
+---------------------------------------------------------------------------------------------------
+-- Open the Contracts Form
+---------------------------------------------------------------------------------------------------
+
+function Generalist:OpenContracts( wndHandler, wndControl, eMouseButton )
+	
+	-- Is a detail window already open?  If so, no contracts.
+	if self.wndDetail ~= nil and self.wndDetail:IsShown() then
+		return
+	end
+		
+	-- Set up the contracts window if it doesn't exist
+	if self.wndContracts == nil then
+		self.wndContracts = Apollo.LoadForm(self.xmlDoc, "ContractsForm", self.wndMain, self)
+	end
+	
+	-- But if it STILL doesn't exist, we need to complain.
+	if self.wndContracts == nil then
+		Apollo.AddAddonErrorText(self, "Could not load the contracts window for some reason.")
+		return
+	end
+	
+	-- Hidden for the moment
+	self.wndContracts:Show(false, true)
+	
+	-- Load current contracts
+	Print("TODO show current contracts")
+	
+	-- Load character contracts
+	for strName, _ in pairs(self.altData) do
+		Print(tostring(strName))
+		if self.altData[strName].contracts then
+			for eContractType, _ in pairs(self.altData[strName].contracts) do
+				for idx, tContract in ipairs(self.altData[strName].contracts[eContractType].arContracts) do
+					Print("  ["..tostring(eContractType).."] "..tostring(tContract.strTitle)..": "..tostring(tContract.strObjective))
+				end
+			end
+		end
+	end
+	
+	-- And now display the window
+	self.wndContracts:Invoke()
+	
+end
+
 -----------------------------------------------------------------------------------------------
 -- Saving and loading our data
 -----------------------------------------------------------------------------------------------
@@ -1315,6 +1411,11 @@ function Generalist:EnsureBackwardsCompatibility(myName)
 	-- Decor
 	if self.altData[myName].decor == nil then
 		self.altData[myName].decor = {}
+	end
+	
+	-- Contracts
+	if self.altData[myName].contracts == nil then
+		self.altData[myName].contracts = {}
 	end
 	
 end
