@@ -82,7 +82,7 @@ local karrCurrency =
 		strDescription = Apollo.GetString("CRB_Crafting_Voucher_Desc")
 	}
 }
-local kContractStatus = {
+local ktContractStatus = {
 	Available = 0,
 	Accepted  = 1,
 	Achieved  = 2,
@@ -1009,11 +1009,22 @@ end
 -- Character's contracts
 ----------------------------
 
+local function getContractTier(contract)
+	local tTmp = {
+		[ContractsLib.ContractQuality.None]       = 1,
+		[ContractsLib.ContractQuality.Good]       = 1,
+		[ContractsLib.ContractQuality.Excellent]  = 2,
+		[ContractsLib.ContractQuality.Superb]     = 3,
+		[ContractsLib.ContractQuality.Legendary]  = 3,
+	}
+	return tTmp[contract:GetQuality()]
+end
+
 local function getContractInfoString(arObjectives, bIgnoreN)
 	local strContractInfo = ""
 	for idx, tObjective in pairs(arObjectives) do
 		if tObjective.nCompleted <= tObjective.nNeeded then
-			if not bIgnoreN then
+			if not bIgnoreN  and tObjective.nNeeded > 1 then
 				strContractInfo = "["..tostring(tObjective.nCompleted).."/"..tostring(tObjective.nNeeded).."] "
 			end
 			strContractInfo = strContractInfo..string.gsub(tObjective.strDescription, '<.->', "")
@@ -1025,21 +1036,21 @@ end
 
 local function getContractStatus(contract)
 	if contract:IsCompleted() then
-		return kContractStatus.Completed
+		return ktContractStatus.Completed
 	elseif contract:IsAchieved() then
-		return kContractStatus.Achieved
+		return ktContractStatus.Achieved
 	elseif contract:IsAccepted() then
-		return kContractStatus.Accepted
+		return ktContractStatus.Accepted
 	else
-		return kContractStatus.Available
+		return ktContractStatus.Available
 	end
 end
 
 local function getContractStatusColor(eContractStatus, bIsFreshData)
-	if eContractStatus == kContractStatus.Completed and bIsFreshData then return "green" end
-	if eContractStatus == kContractStatus.Accepted then return "blue" end
-	if eContractStatus == kContractStatus.Available then return "white" end
-	return "black"
+	if eContractStatus == ktContractStatus.Completed and bIsFreshData then return "green" end
+	if eContractStatus == ktContractStatus.Achieved                   then return "white" end
+	if eContractStatus == ktContractStatus.Accepted                   then return "blue"  end
+	if eContractStatus == ktContractStatus.Available                  then return "black" end
 end
 
 local function makeContractTimestamp(tServerTime)
@@ -1048,11 +1059,27 @@ local function makeContractTimestamp(tServerTime)
 		nYear = tServerTime.nYear,
 		nMonth = tServerTime.nMonth,
 		nDay = tServerTime.nDay,
+		nDayOfWeek = tServerTime.nDayOfWeek,
 	}
 end
 
-local function isSameContractDay(tA, tB)
-	return true
+local function isSameDay(tA, tB) return tA.nYear == tB.nYear and tA.nMonth == tB.nMonth and tA.nDay == tB.nDay end
+
+local function isDayBefore(tA, tB) --return true if tA is a day before tB
+		if (tB.nDayOfWeek - tA.nDayOfWeek) % 7 ~= 1 then return false end
+		if tB.nYear - tA.nYear > 1 then return false end
+		if tB.nYear - tA.nYear == 1 then return tB.nMonth == 1 and tB.nDay == 1 and tA.nMonth == 12 and tA.nDay == 31 end
+		if (tB.nMonth - tA.nMonth) % 12 > 1 then return false end
+		if (tB.nMonth - tA.nMonth) % 12 == 1 then return tB.nDay == 1 and tA.nDay >= 28 end
+		return tB.nDay - tA.nDay == 1
+end
+
+local function isSameContractDay(tA, tB) --assumes tB >= tA
+	if tA.bIsBeforeReset == tB.bIsBeforeReset then
+		return isSameDay(tA, tB)
+	else
+		return isDayBefore(tA, tB)
+	end
 end
 
 function Generalist:GetCharContracts()
@@ -1079,11 +1106,13 @@ function Generalist:GetCharContracts()
 			local quest = contract:GetQuest()
 			table.insert(contracts[eContractType].arCurrent, {
 				nId = contract:GetId(),
+				nTier = getContractTier(contract),
 				strTitle = quest:GetTitle(),
 				strObjective = getContractInfoString(quest:GetVisibleObjectiveData()),
 				eContractStatus = getContractStatus(contract),
 			})
 		end
+		table.sort(contracts[eContractType].arCurrent, function(a, b) return a.nTier < b.nTier or a.nId < b.nId end)
 	end
 	
 	-- Check today's contracts
@@ -1344,7 +1373,12 @@ function Generalist:OpenContracts( wndHandler, wndControl, eMouseButton )
 	if self.wndSearch ~= nil and self.wndSearch:IsShown() then return end
 	
 	-- Destroy old window if it was still open
+	local arContractsPos = nil
+	local bShowPvPContracts = false
 	if self.wndContracts and self.wndContracts:IsValid() then
+		local nL, nT, nR, nB = self.wndContracts:GetAnchorOffsets()
+		arContractsPos = { nL, nT, nR, nB }
+		bShowPvPContracts = self.wndContracts:FindChild("PvPContractsButton"):IsChecked()
 		self.wndContracts:Destroy()
 	end
 		
@@ -1360,6 +1394,11 @@ function Generalist:OpenContracts( wndHandler, wndControl, eMouseButton )
 	-- Hidden for the moment
 	self.wndContracts:Show(false, true)
 	
+	-- Restore old settings
+	if arContractsPos then self.wndContracts:SetAnchorOffsets(unpack(arContractsPos)) end
+	self.wndContracts:FindChild("PvEContractsButton"):SetCheck(not bShowPvPContracts)
+	self.wndContracts:FindChild("PvPContractsButton"):SetCheck(bShowPvPContracts)
+	
 	-- Create contracts list headers
 	local wndContractsList = self.wndContracts:FindChild("Info:List")
 	local wndContractsHeaderEntry = Apollo.LoadForm(self.xmlDoc, "ContractsEntry", wndContractsList)
@@ -1374,26 +1413,48 @@ function Generalist:OpenContracts( wndHandler, wndControl, eMouseButton )
 	local tServerTime = GameLib.GetServerTime()
 	local arPeriodicContracts = ContractsLib.GetPeriodicContracts()
 	
+	-- Get the current character's faction
+	local factID = GameLib.GetPlayerUnit():GetFaction()
+	
+	-- Build list of characters of this faction
+	local a = {}
+	for name in pairs(self.altData) do
+		-- Only add characters of this faction to the list
+		if self.altData[name].faction == factID then
+			table.insert(a, name)
+		end
+	end
+	
+	-- Sort the list (alphabetically)
+	table.sort(a)
+	
 	-- Load character contracts
-	for strName, _ in pairs(self.altData) do
-		if self.altData[strName].contracts and self.altData[strName].contracts[2].tToday then
+	local eContractType = bShowPvPContracts and ContractsLib.ContractType.Pvp or ContractsLib.ContractType.Pve
+	for idx, strName in ipairs(a) do
+		if self.altData[strName].contracts and self.altData[strName].contracts[eContractType].tToday then
 			local wndContractsEntry = Apollo.LoadForm(self.xmlDoc, "ContractsEntry", wndContractsList)
 			wndContractsEntry:FindChild("Name"):SetText(strName)
 			local bIsFreshData = isSameContractDay(self.altData[strName].contracts.tContractTimestamp, makeContractTimestamp(tServerTime))
-			for idx, contract in ipairs(arPeriodicContracts[2]) do
+			for idx, contract in ipairs(arPeriodicContracts[eContractType]) do
 				if idx > 1 then
 					local wndContract = wndContractsEntry:FindChild("Today:Contract"..tostring(idx))
 					wndContract:SetTooltip(getContractInfoString(contract:GetQuest():GetVisibleObjectiveData(), true))
-					wndContract:SetBGColor(getContractStatusColor(self.altData[strName].contracts[2].tToday[idx], bIsFreshData))
+					wndContract:SetBGColor(getContractStatusColor(self.altData[strName].contracts[eContractType].tToday[idx], bIsFreshData))
+					wndContract:AddPixie({
+						strSprite = "Contracts:sprContracts_Difficulty0"..tostring(idx < 5 and 2 or 3),
+						loc = { fPoints = {0,0,1,1}, nOffsets = {7,5,-8,-5} },
+					})
 				end
 			end
-			-- for eContractType, _ in ipairs(self.altData[strName].contracts) do
-				for idx, tContract in ipairs(self.altData[strName].contracts[2].arCurrent) do
-					local wndContract = wndContractsEntry:FindChild("Current:Contract"..tostring(idx))
-					wndContract:SetTooltip(tContract.strObjective)
-					wndContract:SetBGColor(getContractStatusColor(tContract.eContractStatus))
-				end
-			-- end
+			for idx, tContract in ipairs(self.altData[strName].contracts[eContractType].arCurrent) do
+				local wndContract = wndContractsEntry:FindChild("Current:Contract"..tostring(idx))
+				wndContract:SetTooltip(tContract.strObjective)
+				wndContract:SetBGColor(getContractStatusColor(tContract.eContractStatus))
+				wndContract:AddPixie({
+					strSprite = "Contracts:sprContracts_Difficulty0"..tostring(tContract.nTier),
+					loc = { fPoints = {0,0,1,1}, nOffsets = {7,5,-8,-5} },
+				})
+			end
 		end
 	end
 	
