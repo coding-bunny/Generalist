@@ -1050,7 +1050,18 @@ local function getContractStatusColor(eContractStatus, bIsFreshData)
 	if eContractStatus == ktContractStatus.Completed and bIsFreshData then return "green" end
 	if eContractStatus == ktContractStatus.Achieved                   then return "white" end
 	if eContractStatus == ktContractStatus.Accepted                   then return "blue"  end
-	if eContractStatus == ktContractStatus.Available                  then return "black" end
+	return "black"
+end
+
+local function makeContractTable(contract)
+	local quest = contract:GetQuest()
+	local tContract = {
+		nTier = getContractTier(contract),
+		strTitle = quest:GetTitle(),
+		strObjective = getContractInfoString(quest:GetVisibleObjectiveData()),
+		eContractStatus = getContractStatus(contract),
+	}
+	return tContract
 end
 
 local function makeContractTimestamp(tServerTime)
@@ -1097,33 +1108,27 @@ function Generalist:GetCharContracts()
 		return
 	end
 	
-	-- Get current contracts
-	local contracts = {}
-	for eContractType, arContracts in pairs(ContractsLib.GetActiveContracts()) do
-		if not contracts[eContractType] then contracts[eContractType] = {} end
-		if not contracts[eContractType].arCurrent then contracts[eContractType].arCurrent = {} end
-		for idx, contract in ipairs(arContracts) do
-			local quest = contract:GetQuest()
-			table.insert(contracts[eContractType].arCurrent, {
-				nId = contract:GetId(),
-				nTier = getContractTier(contract),
-				strTitle = quest:GetTitle(),
-				strObjective = getContractInfoString(quest:GetVisibleObjectiveData()),
-				eContractStatus = getContractStatus(contract),
-			})
-		end
-		table.sort(contracts[eContractType].arCurrent, function(a, b) return a.nTier < b.nTier or a.nId < b.nId end)
-	end
-	
 	-- Check today's contracts
+	local contracts = {}
 	local tServerTime = GameLib.GetServerTime()
 	for eContractType, arContracts in pairs(ContractsLib.GetPeriodicContracts()) do
-		if not contracts[eContractType] then contracts[eContractType] = {} end
-		if not contracts[eContractType].tToday then contracts[eContractType].tToday = {} end
+		contracts[eContractType] = {
+			tCurrent = {},
+			tAll = {},
+		}
 		for idx, contract in ipairs(arContracts) do
-			if idx > 1 then contracts[eContractType].tToday[idx] = getContractStatus(contract) end
+			contracts[eContractType].tAll[contract:GetId()] = makeContractTable(contract)
 		end
 	end
+	
+	-- Get current contracts
+	for eContractType, arContracts in pairs(ContractsLib.GetActiveContracts()) do
+		for idx, contract in ipairs(arContracts) do
+			contracts[eContractType].tCurrent[contract:GetId()] = makeContractTable(contract)
+			contracts[eContractType].tAll[contract:GetId()] = makeContractTable(contract)
+		end
+	end
+	
 	contracts.tContractTimestamp = makeContractTimestamp(tServerTime)
 	
 	-- And save
@@ -1419,10 +1424,7 @@ function Generalist:OpenContracts( wndHandler, wndControl, eMouseButton )
 	-- Build list of characters of this faction
 	local a = {}
 	for name in pairs(self.altData) do
-		-- Only add characters of this faction to the list
-		if self.altData[name].faction == factID then
-			table.insert(a, name)
-		end
+		table.insert(a, name)
 	end
 	
 	-- Sort the list (alphabetically)
@@ -1431,22 +1433,18 @@ function Generalist:OpenContracts( wndHandler, wndControl, eMouseButton )
 	-- Load character contracts
 	local eContractType = bShowPvPContracts and ContractsLib.ContractType.Pvp or ContractsLib.ContractType.Pve
 	for idx, strName in ipairs(a) do
-		if self.altData[strName].contracts and self.altData[strName].contracts[eContractType].tToday then
+		local contracts = self.altData[strName].contracts
+		if contracts then
 			local wndContractsEntry = Apollo.LoadForm(self.xmlDoc, "ContractsEntry", wndContractsList)
 			wndContractsEntry:FindChild("Name"):SetText(strName)
-			local bIsFreshData = isSameContractDay(self.altData[strName].contracts.tContractTimestamp, makeContractTimestamp(tServerTime))
-			for idx, contract in ipairs(arPeriodicContracts[eContractType]) do
-				if idx > 1 then
-					local wndContract = wndContractsEntry:FindChild("Today:Contract"..tostring(idx))
-					wndContract:SetTooltip(getContractInfoString(contract:GetQuest():GetVisibleObjectiveData(), true))
-					wndContract:SetBGColor(getContractStatusColor(self.altData[strName].contracts[eContractType].tToday[idx], bIsFreshData))
-					wndContract:AddPixie({
-						strSprite = "Contracts:sprContracts_Difficulty0"..tostring(idx < 5 and 2 or 3),
-						loc = { fPoints = {0,0,1,1}, nOffsets = {7,5,-8,-5} },
-					})
-				end
-			end
-			for idx, tContract in ipairs(self.altData[strName].contracts[eContractType].arCurrent) do
+			local arCurrent = {}
+			for id, contract in pairs(contracts[eContractType].tCurrent) do table.insert(arCurrent, contract) end
+			table.sort(arCurrent, function(a, b)
+				if a.nTier < b.nTier then return true  end
+				if a.nTier > b.nTier then return false end
+				return a.strTitle < b.strTitle
+			end)
+			for idx, tContract in ipairs(arCurrent) do
 				local wndContract = wndContractsEntry:FindChild("Current:Contract"..tostring(idx))
 				wndContract:SetTooltip(tContract.strObjective)
 				wndContract:SetBGColor(getContractStatusColor(tContract.eContractStatus))
@@ -1454,6 +1452,19 @@ function Generalist:OpenContracts( wndHandler, wndControl, eMouseButton )
 					strSprite = "Contracts:sprContracts_Difficulty0"..tostring(tContract.nTier),
 					loc = { fPoints = {0,0,1,1}, nOffsets = {7,5,-8,-5} },
 				})
+			end
+			local bIsFreshData = isSameContractDay(contracts.tContractTimestamp, makeContractTimestamp(tServerTime))
+			for idx, contract in ipairs(arPeriodicContracts[eContractType]) do
+				if idx > 1 then
+					local wndContract = wndContractsEntry:FindChild("Today:Contract"..tostring(idx))
+					wndContract:SetTooltip(getContractInfoString(contract:GetQuest():GetVisibleObjectiveData(), true))
+					local eContractStatus = contracts[eContractType].tAll[contract:GetId()] and contracts[eContractType].tAll[contract:GetId()].eContractStatus
+					wndContract:SetBGColor(getContractStatusColor(eContractStatus, bIsFreshData))
+					wndContract:AddPixie({
+						strSprite = "Contracts:sprContracts_Difficulty0"..tostring(getContractTier(contract)),
+						loc = { fPoints = {0,0,1,1}, nOffsets = {7,5,-8,-5} },
+					})
+				end
 			end
 		end
 	end
