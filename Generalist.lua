@@ -1066,7 +1066,7 @@ end
 
 local function makeContractTimestamp(tServerTime)
 	return {
-		bIsBeforeReset = tServerTime.nHour < 8,
+		bIsBeforeReset = tServerTime.nHour < 10,
 		nYear = tServerTime.nYear,
 		nMonth = tServerTime.nMonth,
 		nDay = tServerTime.nDay,
