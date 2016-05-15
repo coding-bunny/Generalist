@@ -1405,6 +1405,11 @@ function Generalist:OpenContracts( wndHandler, wndControl, eMouseButton )
 	self.wndContracts:FindChild("PvPContractsButton"):SetCheck(bShowPvPContracts)
 	
 	-- Create contracts list headers
+	local wndExampleContracts = self.wndContracts:FindChild("ContractStatusKey")
+	wndExampleContracts:FindChild("ContractAvailable"):SetBGColor(getContractStatusColor(ktContractStatus.Available))
+	wndExampleContracts:FindChild("ContractAccepted"):SetBGColor(getContractStatusColor(ktContractStatus.Accepted))
+	wndExampleContracts:FindChild("ContractAchieved"):SetBGColor(getContractStatusColor(ktContractStatus.Achieved))
+	wndExampleContracts:FindChild("ContractCompleted"):SetBGColor(getContractStatusColor(ktContractStatus.Completed, true))
 	local wndContractsList = self.wndContracts:FindChild("Info:List")
 	local wndContractsHeaderEntry = Apollo.LoadForm(self.xmlDoc, "ContractsEntry", wndContractsList)
 	local arColumns = { "Character", "Today", "Current" }
