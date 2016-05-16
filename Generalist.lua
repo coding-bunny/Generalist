@@ -82,6 +82,12 @@ local karrCurrency =
 		strDescription = Apollo.GetString("CRB_Crafting_Voucher_Desc")
 	}
 }
+local ktContractStatus = {
+	Available = 0,
+	Accepted  = 1,
+	Achieved  = 2,
+	Completed = 3,
+}
 
 local origItemToolTipForm = nil
 
@@ -220,6 +226,12 @@ function Generalist:OnDocLoaded()
 		
 		-- Update my dyes if I learn one
 		Apollo.RegisterEventHandler("DyeLearned", "GetCharDyes", self)
+		
+		-- Update contracts if something changes
+		Apollo.RegisterEventHandler("ContractBoardClose", "GetCharContracts", self)
+		Apollo.RegisterEventHandler("ContractBoardOpen", "GetCharContracts", self)
+		Apollo.RegisterEventHandler("ContractObjectiveUpdated", "GetCharContracts", self)
+		Apollo.RegisterEventHandler("ContractStateChanged", "GetCharContracts", self)
 
 		-- Register a timer until we can load player info
 		self.timer = ApolloTimer.Create(2, true, "OnTimer", self)
@@ -288,6 +300,11 @@ end
 function Generalist:OnSearchClose()
 	-- Close the search window
 	self.wndSearch:Show(false,true)
+end
+
+function Generalist:OnContractsClose()
+	-- Close the contracts window
+	self.wndContracts:Show(false,true)
 end
 -----------------------------------------------------------------------------------------------
 -- Populate list of characters
@@ -471,6 +488,9 @@ function Generalist:UpdateCurrentCharacter()
 	
 	-- Decor
 	self:GetCharDecor()
+	
+	-- Contracts
+	self:GetCharContracts()
 	
 end
 -----------------------------------------------------------------------------------------------
@@ -985,6 +1005,137 @@ function Generalist:GetCharDyes()
 	
 end
 
+----------------------------
+-- Character's contracts
+----------------------------
+
+local function getContractTier(contract)
+	local tTmp = {
+		[ContractsLib.ContractQuality.None]       = 1,
+		[ContractsLib.ContractQuality.Good]       = 1,
+		[ContractsLib.ContractQuality.Excellent]  = 2,
+		[ContractsLib.ContractQuality.Superb]     = 3,
+		[ContractsLib.ContractQuality.Legendary]  = 3,
+	}
+	return tTmp[contract:GetQuality()]
+end
+
+local function getContractInfoString(arObjectives, bIgnoreN)
+	local strContractInfo = ""
+	for idx, tObjective in pairs(arObjectives) do
+		if tObjective.nCompleted <= tObjective.nNeeded then
+			if not bIgnoreN  and tObjective.nNeeded > 1 then
+				strContractInfo = "["..tostring(tObjective.nCompleted).."/"..tostring(tObjective.nNeeded).."] "
+			end
+			strContractInfo = strContractInfo..string.gsub(tObjective.strDescription, '<.->', "")
+			break
+		end
+	end
+	return strContractInfo
+end
+
+local function getContractStatus(contract)
+	if contract:IsCompleted() then
+		return ktContractStatus.Completed
+	elseif contract:IsAchieved() then
+		return ktContractStatus.Achieved
+	elseif contract:IsAccepted() then
+		return ktContractStatus.Accepted
+	else
+		return ktContractStatus.Available
+	end
+end
+
+local function getContractStatusColor(eContractStatus, bIsFreshData)
+	if eContractStatus == ktContractStatus.Completed and bIsFreshData then return "green" end
+	if eContractStatus == ktContractStatus.Achieved                   then return "white" end
+	if eContractStatus == ktContractStatus.Accepted                   then return "blue"  end
+	return "black"
+end
+
+local function makeContractTable(contract)
+	local quest = contract:GetQuest()
+	local tContract = {
+		nTier = getContractTier(contract),
+		strTitle = quest:GetTitle(),
+		strObjective = getContractInfoString(quest:GetVisibleObjectiveData()),
+		eContractStatus = getContractStatus(contract),
+	}
+	return tContract
+end
+
+local function makeContractTimestamp(tServerTime)
+	return {
+		bIsBeforeReset = tServerTime.nHour < 10,
+		nYear = tServerTime.nYear,
+		nMonth = tServerTime.nMonth,
+		nDay = tServerTime.nDay,
+		nDayOfWeek = tServerTime.nDayOfWeek,
+	}
+end
+
+local function isSameDay(tA, tB) return tA.nYear == tB.nYear and tA.nMonth == tB.nMonth and tA.nDay == tB.nDay end
+
+local function isDayBefore(tA, tB) --return true if tA is a day before tB
+		if (tB.nDayOfWeek - tA.nDayOfWeek) % 7 ~= 1 then return false end
+		if tB.nYear - tA.nYear > 1 then return false end
+		if tB.nYear - tA.nYear == 1 then return tB.nMonth == 1 and tB.nDay == 1 and tA.nMonth == 12 and tA.nDay == 31 end
+		if (tB.nMonth - tA.nMonth) % 12 > 1 then return false end
+		if (tB.nMonth - tA.nMonth) % 12 == 1 then return tB.nDay == 1 and tA.nDay >= 28 end
+		return tB.nDay - tA.nDay == 1
+end
+
+local function isSameContractDay(tA, tB) --assumes tB >= tA
+	if tA.bIsBeforeReset == tB.bIsBeforeReset then
+		return isSameDay(tA, tB)
+	else
+		return isDayBefore(tA, tB)
+	end
+end
+
+function Generalist:GetCharContracts()
+	
+	-- If possible, get my name.
+	local unitPlayer = GameLib.GetPlayerUnit()
+	if unitPlayer == nil then return end
+	local myName = unitPlayer:GetName()
+	if self.altData[myName] == nil then self.altData[myName] = {} end
+	
+	-- Skip characters under max level
+	local nCharacterLevel = self.altData[myName].level and self.altData[myName].level or 0
+	if nCharacterLevel < 50 then
+		self.altData[myName].contracts = nil
+		return
+	end
+	
+	-- Check today's contracts
+	local contracts = {}
+	local tServerTime = GameLib.GetServerTime()
+	for eContractType, arContracts in pairs(ContractsLib.GetPeriodicContracts()) do
+		contracts[eContractType] = {
+			tCurrent = {},
+			tAll = {},
+		}
+		for idx, contract in ipairs(arContracts) do
+			contracts[eContractType].tAll[contract:GetId()] = makeContractTable(contract)
+		end
+	end
+	
+	-- Get current contracts
+	for eContractType, arContracts in pairs(ContractsLib.GetActiveContracts()) do
+		for idx, contract in ipairs(arContracts) do
+			contracts[eContractType].tCurrent[contract:GetId()] = makeContractTable(contract)
+			contracts[eContractType].tAll[contract:GetId()] = makeContractTable(contract)
+		end
+	end
+	
+	contracts.tContractTimestamp = makeContractTimestamp(tServerTime)
+	
+	-- And save
+	self.altData[myName].contracts = contracts
+	
+end
+
 -----------------------------------------------------------------------------------------------
 -- Generate a Chat Link for an item
 -----------------------------------------------------------------------------------------------
@@ -1015,10 +1166,9 @@ function Generalist:OnCharacterSelected(wndHandler, wndControl)
         return
     end
   
-	-- But is the search window open?
-	if self.wndSearch ~= nil and self.wndSearch:IsShown() then
-		return
-	end
+	-- But is another window open?
+	if self.wndSearch ~= nil and self.wndSearch:IsShown() then return end
+	if self.wndContracts ~= nil and self.wndContracts:IsShown() then return end
 	
     -- Who was picked?
 	local wndItemText = wndControl:FindChild("CharName")
@@ -1194,10 +1344,9 @@ end
 
 function Generalist:OpenSearch( wndHandler, wndControl, eMouseButton )
 	
-	-- Is a detail window already open?  If so, no search.
-	if self.wndDetail ~= nil and self.wndDetail:IsShown() then
-		return
-	end
+	-- Is another window already open?  If so, no search.
+	if self.wndDetail ~= nil and self.wndDetail:IsShown() then return end
+	if self.wndSearch ~= nil and self.wndSearch:IsShown() then return end
 		
 	-- Set up the search window if it doesn't exist
 	if self.wndSearch == nil then
@@ -1215,6 +1364,120 @@ function Generalist:OpenSearch( wndHandler, wndControl, eMouseButton )
 	
 	-- And now display the window
 	self.wndSearch:Invoke()
+	
+end
+
+---------------------------------------------------------------------------------------------------
+-- Open the Contracts Form
+---------------------------------------------------------------------------------------------------
+
+function Generalist:OpenContracts( wndHandler, wndControl, eMouseButton )
+	
+	-- Is another window already open?  If so, no contracts.
+	if self.wndDetail ~= nil and self.wndDetail:IsShown() then return end
+	if self.wndSearch ~= nil and self.wndSearch:IsShown() then return end
+	
+	-- Destroy old window if it was still open
+	local arContractsPos = nil
+	local bShowPvPContracts = false
+	if self.wndContracts and self.wndContracts:IsValid() then
+		local nL, nT, nR, nB = self.wndContracts:GetAnchorOffsets()
+		arContractsPos = { nL, nT, nR, nB }
+		bShowPvPContracts = self.wndContracts:FindChild("PvPContractsButton"):IsChecked()
+		self.wndContracts:Destroy()
+	end
+		
+	-- Set up the contracts window
+	self.wndContracts = Apollo.LoadForm(self.xmlDoc, "ContractsForm", self.wndMain, self)
+	
+	-- If it doesn't exist, we need to complain.
+	if self.wndContracts == nil then
+		Apollo.AddAddonErrorText(self, "Could not load the contracts window for some reason.")
+		return
+	end
+	
+	-- Hidden for the moment
+	self.wndContracts:Show(false, true)
+	
+	-- Restore old settings
+	if arContractsPos then self.wndContracts:SetAnchorOffsets(unpack(arContractsPos)) end
+	self.wndContracts:FindChild("PvEContractsButton"):SetCheck(not bShowPvPContracts)
+	self.wndContracts:FindChild("PvPContractsButton"):SetCheck(bShowPvPContracts)
+	
+	-- Create contracts list headers
+	local wndContractsKey = self.wndContracts:FindChild("ContractStatusKey")
+	for statusName, statusValue in pairs(ktContractStatus) do
+		local wndKeyEntry = wndContractsKey:FindChild("Contract"..statusName)
+		wndKeyEntry:SetBGColor(getContractStatusColor(statusValue, true))
+		wndKeyEntry:SetTooltip(statusName)
+	end
+	local wndContractsList = self.wndContracts:FindChild("Info:List")
+	local wndContractsHeaderEntry = Apollo.LoadForm(self.xmlDoc, "ContractsEntry", wndContractsList)
+	local arColumns = { "Character", "Today", "Current" }
+	local arHeaders = { "Character Name", "Today's Available Contracts", "Current Contracts" }
+	for idx, strColumn in ipairs(arColumns) do
+		wndContractsHeaderEntry:FindChild(strColumn):DestroyChildren()
+		wndContractsHeaderEntry:FindChild(strColumn):SetText(arHeaders[idx])
+	end
+	
+	-- Grab today's contracts
+	local tServerTime = GameLib.GetServerTime()
+	local arPeriodicContracts = ContractsLib.GetPeriodicContracts()
+	
+	-- Get the current character's faction
+	local factID = GameLib.GetPlayerUnit():GetFaction()
+	
+	-- Build list of characters of this faction
+	local a = {}
+	for name in pairs(self.altData) do
+		table.insert(a, name)
+	end
+	
+	-- Sort the list (alphabetically)
+	table.sort(a)
+	
+	-- Load character contracts
+	local eContractType = bShowPvPContracts and ContractsLib.ContractType.Pvp or ContractsLib.ContractType.Pve
+	for idx, strName in ipairs(a) do
+		local contracts = self.altData[strName].contracts
+		if contracts then
+			local wndContractsEntry = Apollo.LoadForm(self.xmlDoc, "ContractsEntry", wndContractsList)
+			wndContractsEntry:FindChild("Name"):SetText(strName)
+			local arCurrent = {}
+			for id, contract in pairs(contracts[eContractType].tCurrent) do table.insert(arCurrent, contract) end
+			table.sort(arCurrent, function(a, b)
+				if a.nTier < b.nTier then return true  end
+				if a.nTier > b.nTier then return false end
+				return a.strTitle < b.strTitle
+			end)
+			for idx, tContract in ipairs(arCurrent) do
+				local wndContract = wndContractsEntry:FindChild("Current:Contract"..tostring(idx))
+				wndContract:SetTooltip(tContract.strObjective)
+				wndContract:SetBGColor(getContractStatusColor(tContract.eContractStatus))
+				wndContract:AddPixie({
+					strSprite = "Contracts:sprContracts_Difficulty0"..tostring(tContract.nTier),
+					loc = { fPoints = {0,0,1,1}, nOffsets = {7,5,-8,-5} },
+				})
+			end
+			local bIsFreshData = isSameContractDay(contracts.tContractTimestamp, makeContractTimestamp(tServerTime))
+			for idx, contract in ipairs(arPeriodicContracts[eContractType]) do
+				if idx > 1 then
+					local wndContract = wndContractsEntry:FindChild("Today:Contract"..tostring(idx))
+					wndContract:SetTooltip(getContractInfoString(contract:GetQuest():GetVisibleObjectiveData(), true))
+					local eContractStatus = contracts[eContractType].tAll[contract:GetId()] and contracts[eContractType].tAll[contract:GetId()].eContractStatus
+					wndContract:SetBGColor(getContractStatusColor(eContractStatus, bIsFreshData))
+					wndContract:AddPixie({
+						strSprite = "Contracts:sprContracts_Difficulty0"..tostring(getContractTier(contract)),
+						loc = { fPoints = {0,0,1,1}, nOffsets = {7,5,-8,-5} },
+					})
+				end
+			end
+		end
+	end
+	
+	-- And now display the window
+	wndContractsList:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.LeftOrTop)
+	self.wndContracts:Invoke()
 	
 end
 
